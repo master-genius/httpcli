@@ -1,0 +1,29 @@
+{
+  "name": "gohttp",
+  "version": "1.0.0",
+  "description": "http client for HTTP/1.1",
+  "main": "httpcli.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/master-genius/httpcli.git"
+  },
+  "keywords": [
+    "http",
+    "https",
+    "gohttp",
+    "go",
+    "httpgo",
+    "gohttps",
+    "goh",
+    "goht"
+  ],
+  "author": "BraveWang",
+  "license": "MPL-2.0",
+  "bugs": {
+    "url": "https://github.com/master-genius/httpcli/issues"
+  },
+  "homepage": "https://github.com/master-genius/httpcli#readme"
+}

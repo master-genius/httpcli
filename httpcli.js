@@ -1,4 +1,11 @@
-
+/**
+ * gohttp 1.1.0
+ * Copyright (c) [2019.08] BraveWang
+ * This software is licensed under the MPL-2.0.
+ * You can use this software according to the terms and conditions of the MPL-2.0.
+ * See the MPL for more details:
+ *     https://www.mozilla.org/en-US/MPL/2.0/
+ */
 'use strict';
 
 const http = require('http');
@@ -85,19 +92,14 @@ module.exports = new function() {
     };
 
     /*
-        options = {
-            encoding,
-            onData
-        }
     */
-    this.get = function(url, options, encoding='utf8') {
-
+    this.get = function(url, options={encoding:'utf8'}) {
         var opts = this.parseUrl(url);
         opts.method = 'GET';
-
         for(var k in options) {
             opts[k] = options[k];
         }
+        var encoding = 'utf8';
 
         var h = (opts.protocol === 'https:') ? https : http;
         return new Promise((rv, rj) => {
@@ -118,10 +120,6 @@ module.exports = new function() {
                 var get_data = '';
 
                 res.on('data', (data) => {
-                    if (options.onData !== undefined && typeof options.onData === 'function') {
-                        options.onData(data);
-                    }
-
                     get_data += data.toString(encoding);
                 });
 
@@ -145,8 +143,7 @@ module.exports = new function() {
         options = {
             data,
             headers,
-            encoding,
-            onData
+            encoding
         }
     */
 
@@ -208,10 +205,6 @@ module.exports = new function() {
 
                 res.setEncoding(options.encoding);
                 res.on('data', (data) => {
-                    if (options.onData !== undefined && typeof options.onData === 'function') {
-                        options.onData(data);
-                    }
-                    
                     res_data += data.toString(options.encoding);
                 });
 
