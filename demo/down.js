@@ -1,5 +1,8 @@
 const httpcli = require('../httpcli');
 
-httpcli.download('http://localhost:5678/download', {
-    dir : process.env.HOME+'/downloads/'
+var hi = new httpcli();
+
+hi.download('http://localhost:5678/download', {
+    dir : process.env.HOME+'/downloads/',
 });
+

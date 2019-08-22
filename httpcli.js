@@ -1,5 +1,5 @@
 /**
- * gohttp 1.1.0
+ * gohttp 1.2.0
  * Copyright (c) [2019.08] BraveWang
  * This software is licensed under the MPL-2.0.
  * You can use this software according to the terms and conditions of the MPL-2.0.
@@ -14,14 +14,20 @@ const crypto = require('crypto');
 const fs = require('fs');
 const urlparse = require('url');
 const qs = require('querystring');
+const bodymaker = require('./bodymaker');
 
-//针对HTTPS协议，不验证证书
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+var gohttp = function (options = {}) {
+    if (! this instanceof gohttp) { return new gohttp(options); }
 
-module.exports = new function() {
+    this.config = {
+        cert: '',
+        
+        key:  '',
 
-    var the = this;
-    
+        //不验证证书，针对HTTPS
+        ignoreTLSAuth : true,
+    };
+
     this.mime_map = {
         'css'   : 'text/css',
         'der'   : 'application/x-x509-ca-cert',
@@ -46,16 +52,14 @@ module.exports = new function() {
 
     this.default_mime   = 'application/octet-stream';
 
-    this.extName = function(filename) {
+    this.extName = function (filename = '') {
+        if (filename.length <= 0) { return ''; }
         var name_split = filename.split('.').filter(p => p.length > 0);
-        if (name_split.length < 2) {
-            return '';
-        }
-
-        return name_split[name_split.length - 1];
+        if (name_split.length < 2) { return ''; }
+        return `.${name_split[name_split.length - 1]}`;
     };
 
-    this.mimeType = function(filename) {
+    this.mimeType = function (filename) {
         var extname = this.extName(filename);
         extname = extname.toLowerCase();
         if (extname !== '' && this.mime_map[extname] !== undefined) {
@@ -64,473 +68,378 @@ module.exports = new function() {
         return this.default_mime;
     };
 
-    this.parseUrl = function(url) {
-        var u = new urlparse.URL(url);
+    //针对HTTPS协议，不验证证书
+    if (this.config.ignoreTLSAuth) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    }
 
-        var opts = {
-            protocol    : u.protocol,
-            host        : u.host,
-            hostname    : u.hostname,
-            port        : u.port,
-            path        : u.pathname,
-            method      : '',
-            search      : u.search,
-            headers     : {
-            
-            }
-        };
-        if (u.search.length > 0) {
-            opts.path += u.search;
-        }
+    this.bodymaker = new bodymaker(options);
+};
 
-        if (u.protocol === 'https:') {
-            opts.requestCert = false;
-            opts.rejectUnauthorized = false;
-        }
-
-        return opts;
+gohttp.prototype.parseUrl = function (url) {
+    var u = new urlparse.URL(url);
+    var urlobj = {
+        hash :      u.hash,
+        host :      u.host,
+        hostname :  u.hostname,
+        port :      u.port,
+        protocol :  u.protocol,
+        path :      u.pathname,
+        method :    'GET',
+        headers : {},
     };
-
-    /*
-    */
-    this.get = function(url, options={encoding:'utf8'}) {
-        var opts = this.parseUrl(url);
-        opts.method = 'GET';
-        for(var k in options) {
-            opts[k] = options[k];
-        }
-        var encoding = 'utf8';
-
-        var h = (opts.protocol === 'https:') ? https : http;
-        return new Promise((rv, rj) => {
-            h.get(url, opts, (res) => {
-
-                let error = null;
-                if (res.statusCode !== 200) {
-                    error = new Error(
-                            `request failed, status code:${res.statusCode}`);
-                }
-
-                if (error) {
-                    res.resume();
-                    rj(error);
-                }
-
-                res.setEncoding(encoding);
-                var get_data = '';
-
-                res.on('data', (data) => {
-                    get_data += data.toString(encoding);
-                });
-
-                res.on('end', () => {
-                    rv(get_data);
-                });
-
-                res.on('error', (err) => {
-                    get_data = '';
-                    rj(err);
-                });
-
-            }).on('error', (err) => {
-                rj(err);
-            });
-        });
-
-    };
-
-    /*
-        options = {
-            data,
-            headers,
-            encoding
-        }
-    */
-
-    this.post = function(url, options = {}) {
-        options.method = 'POST';
-        return the.request(url, options);
-    };
-
-    this.put = function(url, options = {}) {
-        options.method = 'PUT';
-        return the.request(url, options);
-    };
-
-    this.delete = function(url, options = {}) {
-        options.method = 'DELETE';
-        return the.request(url, options);
-    };
-
-    this.request = function(url, options) {
-        if (options.encoding === undefined) {
-            options.encoding = 'utf8';
-        }
-
-        var opts = this.parseUrl(url);
-        var h = (opts.protocol === 'https:') ? https : http;
-        opts.method = options.method;
-        opts.headers = {
-            'content-type'  : 'application/x-www-form-urlencoded',
-        };
-
-        if (options.headers !== undefined) {
-            for(var k in options.headers) {
-                opts.headers[k] = options.headers[k];
-            }
-        }
-        var post_data = '';
-        if (options.data) {
-            if (opts.headers['content-type'] === 'application/x-www-form-urlencoded') {
-                post_data = qs.stringify(options.data);
-            } else {
-                if (typeof options.data === 'object') {
-                    post_data = JSON.stringify(options.data);
-                } else {
-                    post_data = options.data;
-                }
-            }
-            opts.headers['content-length'] = Buffer.byteLength(post_data);
-        }
-
-        for(var k in options) {
-            if (k!='data' && k!='headers') {
-                opts[k] = options[k];
-            }
-        }
-        
-        return new Promise ((rv, rj) => {
-            var r = h.request(opts, (res) => {
-                var res_data = '';
-
-                res.setEncoding(options.encoding);
-                res.on('data', (data) => {
-                    res_data += data.toString(options.encoding);
-                });
-
-                res.on('end', () => {
-                    rv(res_data);
-                });
-
-                res.on('error', (err) => {
-                    rj(err);
-                });
-            });
-
-            r.on('error', (e) => {
-                rj(e);
-            });
-
-            if (post_data) {
-                r.write(post_data);
-            }
-            r.end();
-        });
-    };
-
-    /*
-        fields = {
-            file            : FILE PATH,
-            upload_name     : FILE INDEX NAME,
-            form            : FORM DATA,
-        }
-    */
-    this.upload = function(url, fields) {
-        var opts = this.parseUrl(url);
-        var h = (opts.protocol === 'https:') ? https : http ;
-
-        opts.method = 'POST';
-        opts.headers = {
-            'content-type'  : 'multipart/form-data; '
-        };
-       
-        return new Promise((rv, rj) => {
-            if (fields.file === undefined) {
-                rj(new Error('file not found'));
-            } else {
-                try {
-                    fs.accessSync(fields.file, fs.constants.F_OK|fs.constants.R_OK);
-                    
-                    var name_split = fields.file.split('/').filter(p => p.length > 0);
-                    var filename   = name_split[name_split.length - 1];
-                    var mime_type  = this.mimeType(filename);
-
-                    fs.readFile(fields.file, (err, data) => {
-                        if (err) {
-                            rj(err);
-                        } else {
-                            var retdata = {
-                                data        : data.toString('binary'),
-                                options     : opts,
-                                filename    : filename,
-                                pathname    : fields.file,
-                                name        : fields.upload_name,
-                                httpr       : h,
-                                mime_type   : mime_type
-                            };
-                            if (fields.form !== undefined) {
-                                retdata.formdata = fields.form;
-                            }
-
-                            rv(retdata);
-                        }
-                    });
-                } catch (err) {
-                    rj(err);
-                }
-            }
-
-        }).then((r) => {
-            var bdy = this.boundary();
-
-            var formData = '';
-            if (r.formdata !== undefined) {
-                if (typeof r.formdata === 'object') {
-                    for (var k in r.formdata) {
-                        formData += `\r\n--${bdy}\r\nContent-Disposition: form-data; name=${'"'}${k}${'"'}\r\n\r\n${r.formdata[k]}`;
-                    }
-                }
-            }
-
-            var header_data = `Content-Disposition: form-data; name=${'"'}${r.name}${'"'}; filename=${'"'}${r.filename}${'"'}\r\nContent-Type: ${r.mime_type}`;
-            var payload = `\r\n--${bdy}\r\n${header_data}\r\n\r\n`;
-            var end_data = `\r\n--${bdy}--\r\n`;
-            r.options.headers['content-type'] += `boundary=${bdy}`;
-            r.options.headers['content-length'] = Buffer.byteLength(payload) + Buffer.byteLength(end_data) + fs.statSync(r.pathname).size + Buffer.byteLength(formData);
-
-            return new Promise((rv, rj) => {
-                var http_request = r.httpr.request(r.options, (res) => {
-                    var ret_data = '';
-                    res.setEncoding('utf8');
-
-                    res.on('data', (data) => {
-                        ret_data += data;
-                    });
-
-                    res.on('end', () => {
-                        rv({
-                            err : null,
-                            data : ret_data
-                        });
-                    });
-                });
-
-                http_request.on('error', (err) => {
-                    rv({
-                        err : err,
-                        data : null
-                    });
-                });
-
-                if (formData.length > 0) {
-                    http_request.write(formData);
-                }
-                http_request.write(payload);
-
-                var fstream = fs.createReadStream(r.pathname, {bufferSize : 4096});
-                fstream.pipe(http_request, {end :false});
-                fstream.on('end', () => {
-                    http_request.end(end_data);
-                });
-            });
-            
-        }, (err) => {
+    if (u.search.length > 0) {
+        urlobj.path += u.search;
+    }
+    if (u.protocol === 'https:' && this.config.ignoreTLSAuth) {
+        urlobj.requestCert = false;
+        urlobj.rejectUnauthorized = false;
+    }
+    else if (u.protocol === 'https:') {
+        try {
+            urlobj.cert = fs.readFileSync(this.config.cert);
+            urlobj.key = fs.readFileSync(this.config.key);
+        } catch (err) {
             throw err;
-        });
+        }
+    }
+    return urlobj;
+};
+
+gohttp.prototype.eventTable = {};
+
+gohttp.prototype.on = function (evt, callback){
+    if (typeof callback !== 'function') return;
+    this.eventTable[evt] = callback;
+};
+
+gohttp.prototype.request = function (url, options = {}) {
+    var opts = this.parseUrl(url);
+    if (typeof options !== 'object') { options = {}; }
+
+    var writeStream = null;
+    for(var k in options) {
+        switch (k) {
+            case 'timeout':
+                opts.timeout = options.timeout; break;
+            case 'auth':
+                opts.auth = options.auth; break;
+            case 'headers':
+                for(var k in options.headers) {
+                  opts.headers[k] = options.headers[k];
+                } break;
+            case 'method':
+                opts.method = options.method; break;
+            case 'encoding':
+                opts.encoding = options.encoding; break;
+            case 'stream':
+                writeStream = options.stream;
+            case 'dir':
+                opts.dir = options.dir; break;
+            case 'target':
+                opts.target = options.target; break;
+            case 'progress':
+                opts.progress = options.progress; break;
+            case 'body':
+                opts.body = options.body; break;
+            default: ;
+        }
+    }
+
+    if (opts.encoding === undefined) {
+        opts.encoding = 'utf8';
+    }
+
+    /**
+     * body : string | object
+     *   upload files: {
+     *     files: [
+     *       "image" : [
+     *         //...
+     *       ]
+     *     ],
+     *     form: {}
+     *   }
+     */
+    var postData = {
+        'body': '',
+        'content-length': 0,
+        'content-type': ''
     };
-
-    this.boundary = function() {
-        var hash = crypto.createHash('md5');
-        hash.update(`${Date.now()}-${Math.random()}`);
-        var bdy = hash.digest('hex');
-
-        return `----${bdy}`;
+    var postState = {
+        isUpload: false,
+        isPost: false
     };
-
-    /*
-        method : GET | POST,
-        data   : Object if method == POST,
-        target : FILE_PATH,
-        headers : {}
-    */
-    this.download = function(url, options = {}) {
-        if (options.encoding === undefined) {
-            options.encoding = 'binary';
+    if (opts.method === 'PUT' || opts.method == 'POST') {
+        if (opts.body === undefined) {
+            throw new Error('POST/PUT must with body data, please set body');
+        }
+        if (opts.headers['content-type'] === undefined) {
+            opts.headers['content-type'] = 'application/x-www-form-urlencoded';
+            //throw new Error('you need to set content-type in header');
         }
 
-        var opts = this.parseUrl(url);
-        var h = (opts.protocol === 'https:') ? https : http;
-        opts.method = options.method;
-        if (opts.method === 'POST') {
-            opts.headers = {
-                'content-type'  : 'application/x-www-form-urlencoded',
-            };
+        postState.isPost = true;
+
+        switch (opts.headers['content-type']) {
+            case 'application/x-www-form-urlencoded':
+                postData.body = qs.stringify(opts.body); break;
+            case 'multipart/form-data':
+                postState.isUpload = true;
+                postData = this.bodymaker.makeUploadData(opts.body); break;
+            default:
+                postData.body = JSON.stringify(opts.body);
         }
+    }
+    
+    if (postState.isPost && !postState.isUpload) {
+        postData['content-type'] = opts.headers['content-type'];
+        postData['content-length'] = Buffer.byteLength(postData.body);
+    }
 
-        if (options.headers !== undefined) {
-            for(var k in options.headers) {
-                opts.headers[k] = options.headers[k];
-            }
-        }
+    if (postState.isPost) {
+        opts.headers['content-length'] = postData['content-length'];
+    }
 
-        var post_data = '';
-        if (opts.method === 'POST' || opts.method == 'PUT') {
-            if (opts.headers['content-type'] === 'application/x-www-form-urlencoded') {
-                post_data = qs.stringify(options.data);
-            } else {
-                if (typeof options.data === 'object') {
-                    post_data = JSON.stringify(options.data);
-                } else {
-                    post_data = options.data;
-                }
-            }
-            
-            opts.headers['content-length'] = Buffer.byteLength(post_data);
-        }
+    if (options.isDownload) {
+        return this._coreDownload(opts, postData, postState);
+    }
+    return this._coreRequest(opts, postData, postState, writeStream);
+};
 
-        if (!options.dir) {
-            options.dir = './';
-        } else if (options.dir[options.dir.length-1] !== '/'){
-            options.dir += '/';
-        }
-        var downStream = null;
-
-        if (options.progress === undefined) {
-            options.progress = true;
-        }
-        var filename = '';
-        var total_length = 0;
-        var sid = null;
-        var progressCount = 0;
-        var retData = '';
-        var down_length = 0;
-        
-        return new Promise ((rv, rj) => {
-            var r = h.request(opts, (res) => {
-                let error = null;
-                if (res.statusCode !== 200) {
-                    error = new Error(`request failed, status code:${res.statusCode}`);
-                }
-
-                if (error) {
-                    res.resume();
-                    rj(error);
-                }
-
-                if(res.headers['content-disposition']) {
-                    var name_split = res.headers['content-disposition'].split(';').filter(p => p.length > 0);
-        
-                    for(let i=0; i<name_split.length; i++) {
-                        if (name_split[i].indexOf('filename*=') >= 0) {
-                            filename = name_split[i].trim().substring(10);
-                            filename = filename.split('\'')[2];
-                            filename = decodeURIComponent(filename);
-                        } else if(name_split[i].indexOf('filename=') >= 0) {
-                            filename = name_split[i].trim().substring(9);
-                        }
-                    }
-                }
-
-                if (!filename) {
-                    var nh = crypto.createHash('sha1');
-                    nh.update(`${(new Date()).getTime()}--`);
-                    filename = nh.digest('hex');
-                }
-
-                if (res.headers['content-length']) {
-                    total_length = parseInt(res.headers['content-length']);
-                }
-
-                if (options.target) {
-                    try {
-                        downStream = fs.createWriteStream(
-                            opts.target, {encoding:'binary'}
-                        );
-                    } catch(err) {
-                        console.log(err);
-                        t.end();
-                        ht.session.close();
-                    }
-                } else {
-                    try {
-                        fs.accessSync(options.dir+filename, fs.constants.F_OK);
-                        filename = `${(new Date()).getTime()}-${filename}`;
-                    } catch(err) {
-                    }
-                    downStream = fs.createWriteStream(
-                        options.dir+filename,
-                        {encoding:'binary'}
-                    );
-                }
-
-                res.setEncoding(options.encoding);
-
-                if (downStream !== null) {
-                    downStream.on('error', err => {r.destroy(err);});
-                    res.on('data', data => {
-                        if (downStream === null) {
-                            retData += data.toString('binary');
-                            down_length = retData.length;
-                        } else {
-                            if (retData.length > 0) {
-                                downStream.write(retData, 'binary');
-                                retData = '';
-                            }
-                            down_length += data.length;
-                            downStream.write(data, 'binary');
-                        }
-                        if (options.progress && total_length > 0) {
-                            if (down_length >= total_length) {
-                                console.clear();
-                                console.log('100.00%');
-                            }
-                            else if (progressCount > 25) {
-                              console.clear();
-                              console.log(`${((down_length/total_length)*100).toFixed(2)}%`);
-                              progressCount = 0;
-                            }
-                        }
-                    });
-                    sid = setInterval(() => {progressCount+=1;}, 20);
-                } else {
-                    res.on('data', data => {
-                        retData = data.toString('utf8');
-                        console.log(retData);
-                    });
-                }
-
+gohttp.prototype._coreRequest = async function (opts, postData, postState, wstream=null) {
+    var h = (opts.protocol === 'https:') ? https : http;
+    return new Promise ((rv, rj) => {
+        var r = h.request(opts, (res) => {
+            var res_data = '';
+            res.setEncoding(opts.encoding||'utf8');
+            if (wstream) {
+                res.on('data', data => {
+                    wstream.write(data.toString(opts.encoding), opts.encoding);
+                });
                 res.on('end', () => {
+                    wstream.end();
                     rv(true);
                 });
-
+    
                 res.on('error', (err) => {
+                    wstream.destroy();
                     rj(err);
                 });
-            });
-
-            r.on('error', (e) => {
-                rj(e);
-            });
-
-            r.write(post_data);
-            r.end();
-        })
-        .then(data => {
-            if (options.progress) {
-                console.log('done...');
+            } else {
+                res.on('data', (data) => {
+                    res_data += data.toString(opts.encoding);
+                });
+                res.on('end', () => { rv(res_data); });
+    
+                res.on('error', (err) => { rj(err); });
             }
-        }, err=>{
-            throw err;
-        })
-        .catch(err => {
-            console.log(err);
-        })
-        .finally(() => {
-            if (downStream!==null) {
-                downStream.end();
-            }
-            clearInterval(sid);
         });
+
+        if (wstream) {
+            r.on('error', (e) => { wstream.destroy(); rj(e); });
+        } else {
+            r.on('error', (e) => { rj(e); });
+        }
+
+        if (postState.isPost) {
+            r.write(postData.body, postState.isUpload ? 'binary' : 'utf8');
+        }
+        r.end();
+    });
+};
+
+gohttp.prototype._coreDownload = function (opts, postData, postState) {
+    var h = (opts.protocol === 'https:') ? https : http;
+
+    if (!opts.dir) {opts.dir = './';}
+
+    var getWriteStream = function (filename) {
+        if (opts.target) {
+            return fs.createWriteStream(opts.target, {encoding:'binary'});
+        } else {
+            try {
+                fs.accessSync(opts.dir+filename, fs.constants.F_OK);
+                filename = `${(new Date()).getTime()}-${filename}`;
+            } catch(err) {
+            }
+            return fs.createWriteStream(opts.dir+filename,{encoding:'binary'});
+        }
     };
 
+    var checkMakeFileName = function (filename = '') {
+        if (!filename) {
+            var nh = crypto.createHash('sha1');
+            nh.update(`${(new Date()).getTime()}--`);
+            filename = nh.digest('hex');
+        }
+        return filename;
+    };
+
+    var parseFileName = function (headers) {
+        var fname = '';
+        if(headers['content-disposition']) {
+            var name_split = headers['content-disposition'].split(';').filter(p => p.length > 0);
+
+            for(let i=0; i<name_split.length; i++) {
+                if (name_split[i].indexOf('filename*=') >= 0) {
+                    fname = name_split[i].trim().substring(10);
+                    fname = fname.split('\'')[2];
+                    fname = decodeURIComponent(fname);
+                } else if(name_split[i].indexOf('filename=') >= 0) {
+                    fname = name_split[i].trim().substring(9);
+                }
+            }
+        }
+        return fname;
+    };
+
+    var downStream = null;
+    var filename = '';
+    var total_length = 0;
+    var sid = null;
+    var progressCount = 0;
+    var retData = '';
+    var down_length = 0;
+    if (opts.progress === undefined) {
+        opts.progress = true;
+    }
+    return new Promise((rv, rj) => {
+        var r = h.request(opts, res => {
+            res.setEncoding('binary');
+            filename = parseFileName(res.headers);
+            if (res.headers['content-length']) {
+                total_length = parseInt(res.headers['content-length']);
+            }
+            try {
+                filename = checkMakeFileName(filename);
+                downStream = getWriteStream(filename);
+            } catch (err) {
+                res.destroy();
+                return ;
+            }
+
+            res.on('data', data => {
+                downStream.write(data.toString('binary'), 'binary');
+                down_length += data.length;
+                if (opts.progress && total_length > 0) {
+                    if (down_length >= total_length) {
+                        console.clear();
+                        console.log('100.00%');
+                    } else if (progressCount > 25) {
+                        console.clear();
+                        console.log(`${((down_length/total_length)*100).toFixed(2)}%`);
+                        progressCount = 0;
+                    }
+                }
+            });
+            res.on('end', () => {rv(true);});
+            res.on('error', (err) => { rj(err); });
+            sid = setInterval(() => {progressCount+=1;}, 20);
+        });
+        if (postState.isPost) {
+            r.write(postData.body, postState.isUpload ? 'binary' : 'utf8');
+        }
+        r.end();
+    })
+    .then((r) => {
+        if (opts.progress) { console.log('done...'); }
+    }, (err) => {
+        throw err;
+    })
+    .catch(err => {
+        throw err;
+    })
+    .finally(() => {
+        if (downStream) {
+            downStream.end();
+        }
+        clearInterval(sid);
+    });
 };
+
+gohttp.prototype.checkMethod = function (method, options) {
+    if (typeof options !== 'object') { options = {method: method}; }
+    else if (!options.method || options.method !== method) {
+        options.method = method;
+    }
+};
+
+gohttp.prototype.get = async function (url, options = {}) {
+    this.checkMethod('GET', options);
+    return this.request(url, options);
+};
+
+gohttp.prototype.post = async function (url, options = {}) {
+    this.checkMethod('POST', options);
+    if (!options.body) {
+        throw new Error('must with body data');
+    }
+    return this.request(url, options);
+};
+
+gohttp.prototype.put = async function (url, options = {}) {
+    this.checkMethod('PUT', options);
+    if (!options.body) {
+        throw new Error('must with body data');
+    }
+    return this.request(url, options);
+};
+
+gohttp.prototype.delete = async function (url, options = {}) {
+    this.checkMethod('DELETE', options);
+    return this.request(url, options);
+};
+
+gohttp.prototype.options = async function (url, options = {}) {
+    thid.checkMethod('OPTIONS', options);
+    return this.request(url, options);
+};
+
+gohttp.prototype.upload = async function (url, options = {}) {
+    if (typeof options !== 'object' || !options.method) {options = {method: 'POST'}; }
+    if (options.method !== 'POST' && options.method !== 'PUT') {
+        console.log('Warning: upload must use POST or PUT method, already set to POST');
+    }
+    if (!options.files && !options.form && !options.body) {
+        throw new Error('Error: file or form not found.');
+    }
+    //没有设置body，但是存在files或form，则自动打包成request需要的格式。
+    if (!options.body) {
+        options.body = {};
+        if (options.files) {
+            options.body.files = options.files;
+            delete options.files;
+        }
+        if (options.form) {
+            options.body.form = options.form;
+            delete options.form;
+        }
+    }
+    if (!options.headers) {
+        options.headers = {
+            'content-type' : 'multipart/form-data'
+        };
+    }
+    if (!options.headers['content-type'] 
+        || options.headers['content-type'] !== 'multipart/form-data')
+    {
+        options.headers['content-type'] = 'multipart/form-data';
+    }
+    return this.request(url, options);
+};
+
+gohttp.prototype.download = function(url, options = {}) {
+    if (typeof options !== 'object') {
+        options = {
+            method: 'GET',
+            isDownload: true
+        };
+    } else {
+        if (!options.isDownload) {options.isDownload = true; }
+    }
+    return this.request(url, options);
+
+};
+
+module.exports = gohttp;
