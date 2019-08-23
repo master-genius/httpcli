@@ -1,7 +1,7 @@
 'use strict';
 
 var bodymaker = function (options = {}) {
-    if (!this instanceof bodymaker) {return new bodymaker(options);}
+    if (!(this instanceof bodymaker)) {return new bodymaker(options);}
 
     //最大同时上传文件数量限制
     this.max_upload_limit = 10;
