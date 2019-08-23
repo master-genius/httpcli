@@ -397,7 +397,8 @@ gohttp.prototype.options = async function (url, options = {}) {
 };
 
 gohttp.prototype.upload = async function (url, options = {}) {
-    if (typeof options !== 'object' || !options.method) {options = {method: 'POST'}; }
+    if (typeof options !== 'object') {options = {method: 'POST'}; }
+    if (options.method === undefined) {options.method = 'POST'; }
     if (options.method !== 'POST' && options.method !== 'PUT') {
         console.log('Warning: upload must use POST or PUT method, already set to POST');
     }
