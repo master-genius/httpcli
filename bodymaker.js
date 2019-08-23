@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('crypto');
+
 var bodymaker = function (options = {}) {
     if (!(this instanceof bodymaker)) {return new bodymaker(options);}
 
