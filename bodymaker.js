@@ -104,7 +104,7 @@ bodymaker.preLoadFiles = function(files) {
     return files_data;
 };
 
-bodymaker.boundary = function() {
+bodymaker.prototype.boundary = function() {
     var hash = crypto.createHash('md5');
     hash.update(`${Date.now()}-${Math.random()}`);
     var bdy = hash.digest('hex');
