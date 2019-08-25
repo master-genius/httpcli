@@ -43,7 +43,7 @@ var bodymaker = function (options = {}) {
         if (filename.length <= 0) { return ''; }
         var name_split = filename.split('.').filter(p => p.length > 0);
         if (name_split.length < 2) { return ''; }
-        return `.${name_split[name_split.length - 1]}`;
+        return name_split[name_split.length - 1];
     };
 
     this.mimeType = function (filename) {

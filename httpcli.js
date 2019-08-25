@@ -1,5 +1,5 @@
 /**
- * gohttp 1.3.1
+ * gohttp 1.3.2
  * Copyright (c) [2019.08] BraveWang
  * This software is licensed under the MPL-2.0.
  * You can use this software according to the terms and conditions of the MPL-2.0.
@@ -146,7 +146,9 @@ gohttp.prototype.request = function (url, options = {}) {
                 postData.body = qs.stringify(opts.body); break;
             case 'multipart/form-data':
                 postState.isUpload = true;
-                postData = this.bodymaker.makeUploadData(opts.body); break;
+                postData = this.bodymaker.makeUploadData(opts.body);
+                opts.headers['content-type'] = postData['content-type'];
+                break;
             default:
                 postData.body = JSON.stringify(opts.body);
         }
