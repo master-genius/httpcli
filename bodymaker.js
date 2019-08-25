@@ -14,6 +14,46 @@ var bodymaker = function (options = {}) {
     //单个文件最大上传大小
     this.max_file_size = 220000000;
 
+    this.mime_map = {
+        'css'   : 'text/css',
+        'der'   : 'application/x-x509-ca-cert',
+        'gif'   : 'image/gif',
+        'gz'    : 'application/x-gzip',
+        'h'     : 'text/plain',
+        'htm'   : 'text/html',
+        'html'  : 'text/html',
+        'jpg'   : 'image/jpeg',
+        'jpeg'  : 'image/jpeg',
+        'png'   : 'image/png',
+        'js'    : 'application/x-javascript',
+        'mp3'   : 'audio/mpeg',
+        'mp4'   : 'video/mp4',
+        'c'     : 'text/plain',
+        'exe'   : 'application/octet-stream',
+        'txt'   : 'text/plain',
+        'wav'   : 'audio/x-wav',
+        'svg'   : 'image/svg+xml',
+        'tar'   : 'application/x-tar',
+    };
+
+    this.default_mime   = 'application/octet-stream';
+
+    this.extName = function (filename = '') {
+        if (filename.length <= 0) { return ''; }
+        var name_split = filename.split('.').filter(p => p.length > 0);
+        if (name_split.length < 2) { return ''; }
+        return `.${name_split[name_split.length - 1]}`;
+    };
+
+    this.mimeType = function (filename) {
+        var extname = this.extName(filename);
+        extname = extname.toLowerCase();
+        if (extname !== '' && this.mime_map[extname] !== undefined) {
+            return this.mime_map[extname];
+        }
+        return this.default_mime;
+    };
+
 };
 
 bodymaker.prototype.makeUploadData = function (r) {
@@ -33,14 +73,24 @@ bodymaker.prototype.makeUploadData = function (r) {
     var body_data = Buffer.from(formData).toString('binary');
     var content_length = Buffer.byteLength(formData);
 
-    if (r.files && r.files instanceof Array) {
-        for (var i=0; i<r.files.length; i++) {
-            header_data = `Content-Disposition: form-data; name=${'"'}${r.files[i].upload_name}${'"'}; filename=${'"'}${r.files[i].filename}${'"'}\r\nContent-Type: ${r.files[i].content_type}`;
+    if (r.files && typeof r.files === 'object') {
+        let t = '';
+        let tmp = '';
+        for (var k in r.files) {
+            if (typeof r.files[k] === 'string') {
+                t = [ r.files[k] ];
+            } else {
+                t = r.files[k];
+            }
+            for (let i=0; i<t.length; i++) {
+                header_data = `Content-Disposition: form-data; name=${'"'}${k}${'"'}; filename=${'"'}${t[i]}${'"'}\r\nContent-Type: ${this.mimeType(t[i])}`;
 
-            payload = `\r\n--${bdy}\r\n${header_data}\r\n\r\n`;
-
-            content_length += Buffer.byteLength(payload) + r.files[i].data.length;
-            body_data += Buffer.from(payload).toString('binary') + r.files[i].data;
+                payload = `\r\n--${bdy}\r\n${header_data}\r\n\r\n`;
+                tmp = fs.readFileSync(t[i], {encoding:'binary'});
+                content_length += Buffer.byteLength(payload) + tmp.length;
+                body_data += Buffer.from(payload).toString('binary') + tmp;
+                tmp = '';
+            }
         }
     }
 
@@ -53,57 +103,6 @@ bodymaker.prototype.makeUploadData = function (r) {
         'body' : body_data,
         'content-length' : content_length
     };
-};
-
-/*
-    {
-        "UPLOAD_NAME" : [
-            FILE_LIST
-        ]
-    }
-*/
-bodymaker.preLoadFiles = function(files) {
-    var file_count = 0;
-    var total_size = 0;
-
-    var files_data = [];
-    var filename = '';
-    var name_split = null;
-    var content_type = '';
-
-    for (var k in files) {
-        for (var i=0; i<files[k].length; i++) {
-            if (file_count >= this.max_upload_limit) {
-                throw new Error('too many files, max limit:' + this.max_upload_limit);
-            }
-
-            if (total_size >= the.max_upload_size) {
-                throw new Error('too large data, max size:' + this.max_upload_size);
-            }
-
-            try {
-                filename = files[k][i];
-                name_split = filename.split('/').filter(p => p.length > 0);
-                content_type = the.mimeType(name_split[name_split.length - 1]);
-                var data = fs.readFileSync(filename, {encoding:'binary'});
-                files_data.push({
-                    'upload-name' : k,
-                    'content-type' : content_type,
-                    'filename' : name_split[name_split.length - 1],
-                    'data' : data
-                });
-                file_count += 1;
-                total_size += data.length;
-                if (data.length > this.max_file_size) {
-                    throw new Error('too large file, max file size:' + the.max_file_size);
-                }
-            } catch (err) {
-                console.log(err);
-                file_count -= 1;
-            }
-        }
-    }
-    return files_data;
 };
 
 bodymaker.prototype.boundary = function() {

@@ -1,5 +1,5 @@
 /**
- * gohttp 1.2.2
+ * gohttp 1.3.0
  * Copyright (c) [2019.08] BraveWang
  * This software is licensed under the MPL-2.0.
  * You can use this software according to the terms and conditions of the MPL-2.0.
@@ -26,46 +26,6 @@ var gohttp = function (options = {}) {
 
         //不验证证书，针对HTTPS
         ignoreTLSAuth : true,
-    };
-
-    this.mime_map = {
-        'css'   : 'text/css',
-        'der'   : 'application/x-x509-ca-cert',
-        'gif'   : 'image/gif',
-        'gz'    : 'application/x-gzip',
-        'h'     : 'text/plain',
-        'htm'   : 'text/html',
-        'html'  : 'text/html',
-        'jpg'   : 'image/jpeg',
-        'jpeg'  : 'image/jpeg',
-        'png'   : 'image/png',
-        'js'    : 'application/x-javascript',
-        'mp3'   : 'audio/mpeg',
-        'mp4'   : 'video/mp4',
-        'c'     : 'text/plain',
-        'exe'   : 'application/octet-stream',
-        'txt'   : 'text/plain',
-        'wav'   : 'audio/x-wav',
-        'svg'   : 'image/svg+xml',
-        'tar'   : 'application/x-tar',
-    };
-
-    this.default_mime   = 'application/octet-stream';
-
-    this.extName = function (filename = '') {
-        if (filename.length <= 0) { return ''; }
-        var name_split = filename.split('.').filter(p => p.length > 0);
-        if (name_split.length < 2) { return ''; }
-        return `.${name_split[name_split.length - 1]}`;
-    };
-
-    this.mimeType = function (filename) {
-        var extname = this.extName(filename);
-        extname = extname.toLowerCase();
-        if (extname !== '' && this.mime_map[extname] !== undefined) {
-            return this.mime_map[extname];
-        }
-        return this.default_mime;
     };
 
     //针对HTTPS协议，不验证证书
@@ -299,7 +259,6 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
     var total_length = 0;
     var sid = null;
     var progressCount = 0;
-    var retData = '';
     var down_length = 0;
     if (opts.progress === undefined) {
         opts.progress = true;
