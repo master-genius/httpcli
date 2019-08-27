@@ -1,5 +1,5 @@
 /**
- * gohttp 1.3.2
+ * gohttp 1.3.3
  * Copyright (c) [2019.08] BraveWang
  * This software is licensed under the MPL-2.0.
  * You can use this software according to the terms and conditions of the MPL-2.0.
@@ -17,7 +17,7 @@ const qs = require('querystring');
 const bodymaker = require('./bodymaker');
 
 var gohttp = function (options = {}) {
-    if (! this instanceof gohttp) { return new gohttp(options); }
+    if (! (this instanceof gohttp)) { return new gohttp(options); }
 
     this.config = {
         cert: '',
@@ -192,7 +192,13 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
                 res.on('data', (data) => {
                     res_data += data.toString(opts.encoding);
                 });
-                res.on('end', () => { rv(res_data); });
+                res.on('end', () => {
+                    if (res.statusCode == 200) {    
+                        rv(res_data);
+                    } else {
+                        rj(new Error(`${res.statusCode}: ${res_data}`));
+                    }
+                });
     
                 res.on('error', (err) => { rj(err); });
             }
@@ -405,3 +411,4 @@ gohttp.prototype.download = function(url, options = {}) {
 };
 
 module.exports = gohttp;
+
