@@ -1,5 +1,5 @@
 /**
- * gohttp 1.3.3
+ * gohttp 2.0.0
  * Copyright (c) [2019.08] BraveWang
  * This software is licensed under the MPL-2.0.
  * You can use this software according to the terms and conditions of the MPL-2.0.
@@ -24,14 +24,25 @@ var gohttp = function (options = {}) {
         
         key:  '',
 
+        ignoretls: true,
+
         //不验证证书，针对HTTPS
-        ignoreTLSAuth : true,
+        //ignoreTLSAuth : true,
+        set ignoreTLSAuth (b) {
+            if (b) {
+                this.config.ignoretls = true;
+                process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+            } else {
+                this.config.ignoretls = false;
+                process.env.NODE_TLS_REJECT_UNAUTHORIZED = "1";
+            }
+        }
     };
 
     //针对HTTPS协议，不验证证书
-    if (this.config.ignoreTLSAuth) {
+    /* if (this.config.ignoreTLSAuth) {
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-    }
+    } */
 
     this.bodymaker = new bodymaker(options);
 };
@@ -51,7 +62,7 @@ gohttp.prototype.parseUrl = function (url) {
     if (u.search.length > 0) {
         urlobj.path += u.search;
     }
-    if (u.protocol === 'https:' && this.config.ignoreTLSAuth) {
+    if (u.protocol === 'https:' && this.config.ignoretls) {
         urlobj.requestCert = false;
         urlobj.rejectUnauthorized = false;
     }
@@ -73,7 +84,7 @@ gohttp.prototype.on = function (evt, callback){
     this.eventTable[evt] = callback;
 };
 
-gohttp.prototype.request = function (url, options = {}) {
+gohttp.prototype.request = async function (url, options = {}) {
     var opts = this.parseUrl(url);
     if (typeof options !== 'object') { options = {}; }
 
@@ -140,23 +151,23 @@ gohttp.prototype.request = function (url, options = {}) {
         }
 
         postState.isPost = true;
-
         switch (opts.headers['content-type']) {
             case 'application/x-www-form-urlencoded':
-                postData.body = qs.stringify(opts.body); break;
+                postData.body = Buffer.from(qs.stringify(opts.body)); break;
             case 'multipart/form-data':
                 postState.isUpload = true;
-                postData = this.bodymaker.makeUploadData(opts.body);
+                postData = await this.bodymaker.makeUploadData(opts.body);
                 opts.headers['content-type'] = postData['content-type'];
                 break;
             default:
-                postData.body = JSON.stringify(opts.body);
+                postData.body = Buffer.from(JSON.stringify(opts.body));
         }
     }
     
+    
     if (postState.isPost && !postState.isUpload) {
         postData['content-type'] = opts.headers['content-type'];
-        postData['content-length'] = Buffer.byteLength(postData.body);
+        postData['content-length'] = postData.body.length;
     }
 
     if (postState.isPost) {
@@ -166,6 +177,7 @@ gohttp.prototype.request = function (url, options = {}) {
     if (options.isDownload) {
         return this._coreDownload(opts, postData, postState);
     }
+    
     return this._coreRequest(opts, postData, postState, writeStream);
 };
 
@@ -211,7 +223,8 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
         }
 
         if (postState.isPost) {
-            r.write(postData.body, postState.isUpload ? 'binary' : 'utf8');
+            //r.write(postData.body, postState.isUpload ? 'binary' : 'utf8');
+            r.write(postData.body);
         }
         r.end();
     });
@@ -410,5 +423,4 @@ gohttp.prototype.download = function(url, options = {}) {
 
 };
 
-module.exports = gohttp;
-
+module.exports = new gohttp();
