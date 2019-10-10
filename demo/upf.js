@@ -7,7 +7,7 @@ hcli.upload('https://localhost:2021/upload', {
             //'/home/wy/c/a.c',
             //'/home/wy/c/daet.c',
 
-            '/home/wy/tmp/机灵小不懂E20.mkv'
+            '/media/wy/MasterData/Videos/Movies/黑暗之中.mp4'
         ]
     }
 }).then(d => {
