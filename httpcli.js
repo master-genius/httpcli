@@ -394,7 +394,7 @@ gohttp.prototype.upload = async function (url, options = {}) {
     if (options.method !== 'POST' && options.method !== 'PUT') {
         console.log('Warning: upload must use POST or PUT method, already set to POST');
     }
-    if (!options.files && !options.form && !options.body) {
+    if (!options.files && !options.form && !options.body && !options.rawBody) {
         throw new Error('Error: file or form not found.');
     }
     //没有设置body，但是存在files或form，则自动打包成request需要的格式。
