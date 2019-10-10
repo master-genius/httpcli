@@ -160,7 +160,19 @@ gohttp.prototype.request = async function (url, options = {}) {
                 opts.headers['content-type'] = postData['content-type'];
                 break;
             default:
-                postData.body = Buffer.from(JSON.stringify(opts.body));
+                if (opts.headers['content-type'].indexOf('multipart/form-data') >= 0)
+                {
+                    postState.isUpload = true;
+                    if (options.rawBody !== undefined) {
+                        postData = {
+                            'content-type' : '',
+                            'body' : options.rawBody,
+                            'content-length' : options.rawBody.length
+                        };
+                    }
+                } else {
+                    postData.body = Buffer.from(JSON.stringify(opts.body));
+                }
         }
     }
     
