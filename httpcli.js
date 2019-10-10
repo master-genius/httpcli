@@ -415,7 +415,7 @@ gohttp.prototype.upload = async function (url, options = {}) {
         };
     }
     if (!options.headers['content-type'] 
-        || options.headers['content-type'] !== 'multipart/form-data')
+        || options.headers['content-type'].indexOf('multipart/form-data') < 0)
     {
         options.headers['content-type'] = 'multipart/form-data';
     }
