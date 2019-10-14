@@ -1,5 +1,5 @@
 /**
- * gohttp 2.0.0
+ * gohttp
  * Copyright (c) [2019.08] BraveWang
  * This software is licensed under the MPL-2.0.
  * You can use this software according to the terms and conditions of the MPL-2.0.
@@ -171,7 +171,11 @@ gohttp.prototype.request = async function (url, options = {}) {
                         };
                     }
                 } else {
-                    postData.body = Buffer.from(JSON.stringify(opts.body));
+                    if (typeof opts.body === 'object') {
+                        postData.body = Buffer.from(JSON.stringify(opts.body));
+                    } else {
+                        postData.body = Buffer.from(opts.body);
+                    }
                 }
         }
     }
