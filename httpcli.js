@@ -113,6 +113,8 @@ gohttp.prototype.request = async function (url, options = {}) {
                 opts.progress = options.progress; break;
             case 'body':
                 opts.body = options.body; break;
+            case 'rawBody':
+                opts.rawBody = options.rawBody; break;
             default: ;
         }
     }
@@ -141,9 +143,9 @@ gohttp.prototype.request = async function (url, options = {}) {
         isUpload: false,
         isPost: false
     };
-    if (opts.method === 'PUT' || opts.method == 'POST') {
-        if (opts.body === undefined) {
-            throw new Error('POST/PUT must with body data, please set body');
+    if (opts.method === 'PUT' || opts.method == 'POST' || opts.method === 'PATCH') {
+        if (opts.body === undefined && opts.rawBody === undefined) {
+            throw new Error('POST/PUT must with body data, please set body or rawBody');
         }
         if (opts.headers['content-type'] === undefined) {
             opts.headers['content-type'] = 'application/x-www-form-urlencoded';
