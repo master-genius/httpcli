@@ -224,9 +224,17 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
         });
       } else {
         res.on('data', (data) => {
-          //res_data += data.toString(opts.encoding);
-          retBuf.buffers.push(data);
-          retBuf.length += data.length;
+          //如果消息头有content-length则返回结果会是字符串而不是buffer。
+          //但是无法保证content-length和实际数据是否一致。
+          //所以会把字符串转换为buffer。
+          if (typeof data === 'string') {
+            let bd = Buffer.from(data);
+            retBuf.buffers.push(bd);
+            retBuf.length += bd.length;
+          } else {
+            retBuf.buffers.push(data);
+            retBuf.length += data.length;
+          }
         });
         res.on('end', () => {
           retData = Buffer.concat(retBuf.buffers, retBuf.length);

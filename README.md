@@ -19,9 +19,7 @@ npm i gohttp
 
 const gohttp = require('gohttp');
 
-var hcli = new gohttp();
-
-hcli.get('http://localhost:2019/')
+gohttp.get('http://localhost:2020/')
 .then(data => {
     console.log(data);
 }, err => {
@@ -36,9 +34,7 @@ hcli.get('http://localhost:2019/')
 
 const gohttp = require('gohttp');
 
-var hcli = new gohttp();
-
-hcli.post('http://localhost:2019/p', {
+gohttp.post('http://localhost:2020/p', {
     body : {
         user: 'wang'
     }
@@ -57,9 +53,7 @@ hcli.post('http://localhost:2019/p', {
 
 const gohttp = require('gohttp');
 
-var hcli = new gohttp();
-
-hcli.upload('http://localhost:2019/upload', {
+gohttp.upload('http://localhost:2020/upload', {
     files: {
         image: [
             'pictures/a.jpg',
