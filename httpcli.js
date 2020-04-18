@@ -245,7 +245,7 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
                 rv(retData);
             }
           } else {
-            rj(new Error(`${res.statusCode}: ${resData.toString()}`));
+            rj(new Error(`${res.statusCode}: ${retData.toString()}`));
           }
         });
   
