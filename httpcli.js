@@ -62,10 +62,13 @@ gohttp.prototype.parseUrl = function (url) {
   if (u.search.length > 0) {
     urlobj.path += u.search;
   }
+  
   if (u.protocol  === 'unix:') {
     urlobj.protocol = 'http:';
-    urlobj.socketPath = u.pathname;
-    delete urlobj.path;
+    let sockarr = u.pathname.split('.sock');
+    urlobj.socketPath = `${sockarr[0]}.sock`;
+    urlobj.path = sockarr[1];
+    delete urlobj.host;
     delete urlobj.port;
   }
 
@@ -92,7 +95,13 @@ gohttp.prototype.on = function (evt, callback){
 };
 
 gohttp.prototype.request = async function (url, options = {}) {
-  var opts = this.parseUrl(url);
+  var opts = {};
+  if (typeof url === 'string') {
+    opts = this.parseUrl(url);
+  } else {
+    opts = url;
+  }
+
   if (typeof options !== 'object') { options = {}; }
 
   var writeStream = null;
@@ -103,9 +112,14 @@ gohttp.prototype.request = async function (url, options = {}) {
       case 'auth':
         opts.auth = options.auth; break;
       case 'headers':
-        for(var k in options.headers) {
-          opts.headers[k] = options.headers[k];
-        } break;
+        if (opts.headers) {
+          for(var k in options.headers) {
+            opts.headers[k] = options.headers[k];
+          }
+        } else {
+          opts.headers = options.headers;
+        }
+        break;
       case 'method':
         opts.method = options.method; break;
       case 'encoding':

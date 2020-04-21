@@ -35,6 +35,7 @@ var bodymaker = function (options = {}) {
         'wav'   : 'audio/x-wav',
         'svg'   : 'image/svg+xml',
         'tar'   : 'application/x-tar',
+        'webp'  : 'image/webp'
     };
 
     this.default_mime   = 'application/octet-stream';
