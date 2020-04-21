@@ -1,6 +1,6 @@
 {
   "name": "gohttp",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "http client for HTTP/1.1",
   "main": "httpcli.js",
   "scripts": {

@@ -443,7 +443,7 @@ gohttp.prototype.upload = async function (url, options = {}) {
     throw new Error('Error: file or form not found.');
   }
   //没有设置body，但是存在files或form，则自动打包成request需要的格式。
-  if (!options.body) {
+  if (!options.body && !options.rawBody) {
     options.body = {};
     if (options.files) {
       options.body.files = options.files;
