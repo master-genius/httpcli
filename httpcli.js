@@ -62,6 +62,10 @@ gohttp.prototype.parseUrl = function (url) {
   if (u.search.length > 0) {
     urlobj.path += u.search;
   }
+  if (u.protocol  === 'unix:') {
+    u.protocol = 'http:';
+  }
+
   if (u.protocol === 'https:' && this.config.ignoretls) {
     urlobj.requestCert = false;
     urlobj.rejectUnauthorized = false;
