@@ -63,7 +63,10 @@ gohttp.prototype.parseUrl = function (url) {
     urlobj.path += u.search;
   }
   if (u.protocol  === 'unix:') {
-    u.protocol = 'http:';
+    urlobj.protocol = 'http:';
+    urlobj.socketPath = u.pathname;
+    delete urlobj.path;
+    delete urlobj.port;
   }
 
   if (u.protocol === 'https:' && this.config.ignoretls) {
