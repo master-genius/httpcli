@@ -1,6 +1,6 @@
 {
   "name": "gohttp",
-  "version": "2.1.6",
+  "version": "2.2.0",
   "description": "http client for HTTP/1.1",
   "main": "httpcli.js",
   "scripts": {
@@ -18,7 +18,10 @@
     "httpgo",
     "gohttps",
     "goh",
-    "goht"
+    "goht",
+    "httpcli",
+    "httpclient",
+    "client"
   ],
   "author": "BraveWang",
   "license": "MPL-2.0",

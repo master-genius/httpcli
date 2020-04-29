@@ -100,6 +100,9 @@ gohttp.prototype.request = async function (url, options = {}) {
     opts = this.parseUrl(url);
   } else {
     opts = url;
+    if (opts.timeout === undefined) {
+      opts.timeout = 30000;
+    }
   }
 
   if (typeof options !== 'object') { options = {}; }
@@ -272,6 +275,10 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
   
         res.on('error', (err) => { rj(err); });
       }
+    });
+
+    r.on('timeout', (sock) => {
+      r.abort();
     });
 
     if (wstream) {
