@@ -101,7 +101,7 @@ gohttp.prototype.request = async function (url, options = {}) {
   } else {
     opts = url;
     if (opts.timeout === undefined) {
-      opts.timeout = 30000;
+      opts.timeout = 35000;
     }
   }
 
@@ -143,9 +143,10 @@ gohttp.prototype.request = async function (url, options = {}) {
     }
   }
 
-  if (opts.encoding === undefined) {
+  //默认采用buffer
+  /* if (opts.encoding === undefined) {
     opts.encoding = 'utf8';
-  }
+  } */
 
   /**
    * body : string | object
@@ -180,11 +181,13 @@ gohttp.prototype.request = async function (url, options = {}) {
     switch (opts.headers['content-type']) {
       case 'application/x-www-form-urlencoded':
         postData.body = Buffer.from(qs.stringify(opts.body)); break;
+
       case 'multipart/form-data':
         postState.isUpload = true;
         postData = await this.bodymaker.makeUploadData(opts.body);
         opts.headers['content-type'] = postData['content-type'];
         break;
+
       default:
         if (opts.headers['content-type'].indexOf('multipart/form-data') >= 0)
         {
@@ -232,10 +235,19 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
         length : 0
       };
       var retData = '';
-      res.setEncoding(opts.encoding||'utf8');
+      //res.setEncoding(opts.encoding||'utf8');
+      if (opts.encoding) {
+        //默认为buffer
+        res.setEncoding(opts.encoding);
+      }
+
       if (wstream) {
         res.on('data', data => {
-          wstream.write(data.toString(opts.encoding), opts.encoding);
+          if (opts.encoding) {
+            wstream.write(data, opts.encoding);
+          } else {
+            wstream.write(data);
+          }
         });
         res.on('end', () => {
           wstream.end();
@@ -252,6 +264,7 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
           //但是无法保证content-length和实际数据是否一致。
           //所以会把字符串转换为buffer。
           if (typeof data === 'string') {
+            console.log('is string');
             let bd = Buffer.from(data);
             retBuf.buffers.push(bd);
             retBuf.length += bd.length;
@@ -303,12 +316,13 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
     if (opts.target) {
       return fs.createWriteStream(opts.target, {encoding:'binary'});
     } else {
+      let dfname = `${opts.dir}/${filename}`;
       try {
-        fs.accessSync(opts.dir+filename, fs.constants.F_OK);
-        filename = `${(new Date()).getTime()}-${filename}`;
-      } catch(err) {
-      }
-      return fs.createWriteStream(opts.dir+filename,{encoding:'binary'});
+        fs.accessSync(dfname, fs.constants.F_OK);
+        dfname = `${Date.now()}-${dfname}`;
+      } catch(err) {}
+
+      return fs.createWriteStream(dfname,{encoding:'binary'});
     }
   };
 
@@ -350,7 +364,7 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
   }
   return new Promise((rv, rj) => {
     var r = h.request(opts, res => {
-      res.setEncoding('binary');
+      //res.setEncoding('binary');
       filename = parseFileName(res.headers);
       if (res.headers['content-length']) {
         total_length = parseInt(res.headers['content-length']);
@@ -359,12 +373,13 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
         filename = checkMakeFileName(filename);
         downStream = getWriteStream(filename);
       } catch (err) {
+        console.log(err);
         res.destroy();
         return ;
       }
 
       res.on('data', data => {
-        downStream.write(data.toString('binary'), 'binary');
+        downStream.write(data);
         down_length += data.length;
         if (opts.progress && total_length > 0) {
           if (down_length >= total_length) {
@@ -387,7 +402,7 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
     r.end();
   })
   .then((r) => {
-    if (opts.progress) { console.log('done...'); }
+    if (opts.progress) { console.log('done.'); }
   }, (err) => {
     throw err;
   })

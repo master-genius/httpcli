@@ -1,9 +1,9 @@
 const hcli = require('../httpcli.js');
 
 for(let i=0; i<2000; i++) {
-    hcli.get('http://localhost:2019/')
+    hcli.get('https://localhost:2021/test')
     .then(data => {
-        console.log(data);
+        console.log(data.toString());
     }, err => {
         throw err; 
     })
@@ -15,7 +15,7 @@ for(let i=0; i<2000; i++) {
         body : {user : 'brave'}
     })
     .then(data => {
-        console.log(data);
+        console.log(data.toString());
     }, err => {
         throw err; 
     })
@@ -23,4 +23,3 @@ for(let i=0; i<2000; i++) {
         console.log(err);
     });
 }
-
