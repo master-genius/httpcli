@@ -100,14 +100,13 @@ gohttp.prototype.request = async function (url, options = {}) {
     opts = this.parseUrl(url);
   } else {
     opts = url;
-    if (opts.timeout === undefined) {
-      opts.timeout = 35000;
-    }
+  }
+  if (opts.timeout === undefined) {
+    opts.timeout = 35000;
   }
 
   if (typeof options !== 'object') { options = {}; }
 
-  var writeStream = null;
   for(var k in options) {
     switch (k) {
       case 'timeout':
@@ -127,8 +126,7 @@ gohttp.prototype.request = async function (url, options = {}) {
         opts.method = options.method; break;
       case 'encoding':
         opts.encoding = options.encoding; break;
-      case 'stream':
-        writeStream = options.stream;
+
       case 'dir':
         opts.dir = options.dir; break;
       case 'target':
@@ -223,10 +221,10 @@ gohttp.prototype.request = async function (url, options = {}) {
     return this._coreDownload(opts, postData, postState);
   }
   
-  return this._coreRequest(opts, postData, postState, writeStream);
+  return this._coreRequest(opts, postData, postState);
 };
 
-gohttp.prototype._coreRequest = async function (opts, postData, postState, wstream=null) {
+gohttp.prototype._coreRequest = async function (opts, postData, postState) {
   var h = (opts.protocol === 'https:') ? https : http;
   return new Promise ((rv, rj) => {
     var r = h.request(opts, (res) => {
@@ -240,31 +238,11 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
         //默认为buffer
         res.setEncoding(opts.encoding);
       }
-
-      if (wstream) {
-        res.on('data', data => {
-          if (opts.encoding) {
-            wstream.write(data, opts.encoding);
-          } else {
-            wstream.write(data);
-          }
-        });
-        res.on('end', () => {
-          wstream.end();
-          rv();
-        });
-  
-        res.on('error', (err) => {
-          wstream.destroy();
-          rj(err);
-        });
-      } else {
         res.on('data', (data) => {
           //如果消息头有content-length则返回结果会是字符串而不是buffer。
           //但是无法保证content-length和实际数据是否一致。
           //所以会把字符串转换为buffer。
           if (typeof data === 'string') {
-            console.log('is string');
             let bd = Buffer.from(data);
             retBuf.buffers.push(bd);
             retBuf.length += bd.length;
@@ -287,18 +265,13 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState, wstre
         });
   
         res.on('error', (err) => { rj(err); });
-      }
     });
 
+    r.setTimeout(opts.timeout);
     r.on('timeout', (sock) => {
       r.abort();
     });
-
-    if (wstream) {
-      r.on('error', (e) => { wstream.destroy(); rj(e); });
-    } else {
-      r.on('error', (e) => { rj(e); });
-    }
+    r.on('error', (e) => { rj(e); });
 
     if (postState.isPost) {
       r.write(postData.body);
