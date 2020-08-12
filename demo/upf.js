@@ -7,7 +7,7 @@ hcli.upload('https://localhost:2021/upload', {
             //'/home/wy/c/a.c',
             //'/home/wy/c/daet.c',
 
-            '/media/wy/MasterData/Videos/Movies/义盖云天.mkv'
+            '/home/wy/music/common/与尔同途.mp3'
         ]
     }
 }).then(d => {

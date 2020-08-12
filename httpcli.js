@@ -1,11 +1,3 @@
-/**
- * gohttp
- * Copyright (c) [2019.08] BraveWang
- * This software is licensed under the MPL-2.0.
- * You can use this software according to the terms and conditions of the MPL-2.0.
- * See the MPL for more details:
- *   https://www.mozilla.org/en-US/MPL/2.0/
- */
 'use strict';
 
 const http = require('http');
@@ -38,11 +30,6 @@ var gohttp = function (options = {}) {
       }
     }
   };
-
-  //针对HTTPS协议，不验证证书
-  /* if (this.config.ignoreTLSAuth) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-  } */
 
   this.bodymaker = new bodymaker(options);
 };
@@ -95,9 +82,14 @@ gohttp.prototype.on = function (evt, callback){
 };
 
 gohttp.prototype.request = async function (url, options = {}) {
+
   var opts = {};
   if (typeof url === 'string') {
-    opts = this.parseUrl(url);
+    opts = this.getCache(url);
+    if (opts === null) {
+      opts = this.parseUrl(url);
+      this.setCache(url, opts);
+    }
   } else {
     opts = url;
   }
@@ -107,7 +99,7 @@ gohttp.prototype.request = async function (url, options = {}) {
 
   if (typeof options !== 'object') { options = {}; }
 
-  for(var k in options) {
+  for(let k in options) {
     switch (k) {
       case 'timeout':
         opts.timeout = options.timeout; break;
@@ -115,8 +107,8 @@ gohttp.prototype.request = async function (url, options = {}) {
         opts.auth = options.auth; break;
       case 'headers':
         if (opts.headers) {
-          for(var k in options.headers) {
-            opts.headers[k] = options.headers[k];
+          for(let i in options.headers) {
+            opts.headers[i] = options.headers[i];
           }
         } else {
           opts.headers = options.headers;
@@ -140,11 +132,6 @@ gohttp.prototype.request = async function (url, options = {}) {
       default: ;
     }
   }
-
-  //默认采用buffer
-  /* if (opts.encoding === undefined) {
-    opts.encoding = 'utf8';
-  } */
 
   /**
    * body : string | object
@@ -172,13 +159,13 @@ gohttp.prototype.request = async function (url, options = {}) {
     }
     if (opts.headers['content-type'] === undefined) {
       opts.headers['content-type'] = 'application/x-www-form-urlencoded';
-      //throw new Error('you need to set content-type in header');
     }
 
     postState.isPost = true;
     switch (opts.headers['content-type']) {
       case 'application/x-www-form-urlencoded':
-        postData.body = Buffer.from(qs.stringify(opts.body)); break;
+        postData.body = Buffer.from(qs.stringify(opts.body));
+        break;
 
       case 'multipart/form-data':
         postState.isUpload = true;
@@ -187,8 +174,7 @@ gohttp.prototype.request = async function (url, options = {}) {
         break;
 
       default:
-        if (opts.headers['content-type'].indexOf('multipart/form-data') >= 0)
-        {
+        if (opts.headers['content-type'].indexOf('multipart/form-data') >= 0) {
           postState.isUpload = true;
           if (options.rawBody !== undefined) {
             postData = {
@@ -225,23 +211,25 @@ gohttp.prototype.request = async function (url, options = {}) {
 };
 
 gohttp.prototype._coreRequest = async function (opts, postData, postState) {
+  
   var h = (opts.protocol === 'https:') ? https : http;
+
   return new Promise ((rv, rj) => {
     var r = h.request(opts, (res) => {
-      var retBuf = {
-        buffers : [],
-        length : 0
-      };
-      var retData = '';
-      //res.setEncoding(opts.encoding||'utf8');
-      if (opts.encoding) {
-        //默认为buffer
-        res.setEncoding(opts.encoding);
-      }
+        var retBuf = {
+          buffers : [],
+          length : 0
+        };
+        var retData = '';
+
+        if (opts.encoding) {
+          //默认为buffer
+          res.setEncoding(opts.encoding);
+        }
+
         res.on('data', (data) => {
           //如果消息头有content-length则返回结果会是字符串而不是buffer。
-          //但是无法保证content-length和实际数据是否一致。
-          //所以会把字符串转换为buffer。
+          //但是无法保证content-length和实际数据是否一致，所以会把字符串转换为buffer。
           if (typeof data === 'string') {
             let bd = Buffer.from(data);
             retBuf.buffers.push(bd);
@@ -268,14 +256,15 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState) {
     });
 
     r.setTimeout(opts.timeout);
-    r.on('timeout', (sock) => {
-      r.abort();
-    });
+
+    r.on('timeout', (sock) => { r.destroy(); });
+    
     r.on('error', (e) => { rj(e); });
 
     if (postState.isPost) {
       r.write(postData.body);
     }
+
     r.end();
   });
 };
@@ -365,9 +354,14 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
           }
         }
       });
+      
       res.on('end', () => {rv(true);});
       res.on('error', (err) => { rj(err); });
-      sid = setInterval(() => {progressCount+=1;}, 20);
+
+      sid = setInterval(() => {
+        progressCount+=1;
+      }, 20);
+
     });
     if (postState.isPost) {
       r.write(postData.body, postState.isUpload ? 'binary' : 'utf8');
@@ -375,13 +369,11 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
     r.end();
   })
   .then((r) => {
-    if (opts.progress) { console.log('done.'); }
+    if (opts.progress) { console.log('ok.'); }
   }, (err) => {
     throw err;
   })
-  .catch(err => {
-    throw err;
-  })
+  .catch(err => { throw err; })
   .finally(() => {
     if (downStream) {
       downStream.end();
@@ -391,8 +383,9 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
 };
 
 gohttp.prototype.checkMethod = function (method, options) {
-  if (typeof options !== 'object') { options = {method: method}; }
-  else if (!options.method || options.method !== method) {
+  if (typeof options !== 'object') {
+    options = {method: method};
+  } else if (!options.method || options.method !== method) {
     options.method = method;
   }
 };
@@ -404,7 +397,7 @@ gohttp.prototype.get = async function (url, options = {}) {
 
 gohttp.prototype.post = async function (url, options = {}) {
   this.checkMethod('POST', options);
-  if (!options.body) {
+  if (!options.body && !options.rawBody) {
     throw new Error('must with body data');
   }
   return this.request(url, options);
@@ -412,7 +405,7 @@ gohttp.prototype.post = async function (url, options = {}) {
 
 gohttp.prototype.put = async function (url, options = {}) {
   this.checkMethod('PUT', options);
-  if (!options.body) {
+  if (!options.body && !options.rawBody) {
     throw new Error('must with body data');
   }
   return this.request(url, options);
@@ -429,11 +422,18 @@ gohttp.prototype.options = async function (url, options = {}) {
 };
 
 gohttp.prototype.upload = async function (url, options = {}) {
-  if (typeof options !== 'object') {options = {method: 'POST'}; }
-  if (options.method === undefined) {options.method = 'POST'; }
-  if (options.method !== 'POST' && options.method !== 'PUT') {
-    console.log('Warning: upload must use POST or PUT method, already set to POST');
+  if (typeof options !== 'object') {
+    options = {method: 'POST'}; 
   }
+
+  if (options.method === undefined) {
+    options.method = 'POST';
+  }
+
+  if (options.method !== 'POST' && options.method !== 'PUT') {
+    console.error('Warning: upload must use POST or PUT method, already set to POST');
+  }
+
   if (!options.files && !options.form && !options.body && !options.rawBody) {
     throw new Error('Error: file or form not found.');
   }
@@ -473,6 +473,80 @@ gohttp.prototype.download = function(url, options = {}) {
   }
   return this.request(url, options);
 
+};
+
+
+gohttp.prototype.cacheUrl = {};
+gohttp.prototype.cacheCount = 0;
+gohttp.prototype.maxCache = 20000;
+
+gohttp.prototype.cid = function (url) {
+  let h = crypto.createHash('sha1');
+  h.update(url);
+  return h.digest('hex');
+};
+
+gohttp.prototype.getCache = function (url) {
+  let id = this.cid(url);
+  if (this.cacheUrl[id] === undefined) {
+    return null;
+  }
+  return this.cacheUrl[id];
+};
+
+gohttp.prototype.setCache = function (url, uobj) {
+  let id = this.cid(url);
+  
+  if (this.cacheCount >= this.maxCache) {
+    this.cleanCache();
+  }
+
+  if (this.cacheUrl[id] === undefined) {
+    this.cacheCount += 1;
+  }
+
+  this.cacheUrl[id] = uobj;
+};
+
+gohttp.prototype.cleanCache = function () {
+  this.cacheUrl = {};
+  this.cacheCount = 0;
+};
+
+/**
+ * 这个接口主要是为了快速转发，接收到的数据，不需要经过任何解析，直接转发，不经过request接口的复杂选项解析。
+ * 并且body必须是buffer类型。
+ * 首次操作，会把解析的url缓存到cacheLastUrl。
+ * 如果确定了要转发的url，你可以先通过parseUrl解析后并保存结果，之后每次都直接传递这个对象。
+ */
+gohttp.prototype.transmitTimeout = 20000;
+
+gohttp.prototype.transmit = function (url, headers, rawbody = null) {
+  let postopts = {
+    isPost: false
+  };
+  if (rawbody && rawbody instanceof Buffer) {
+    postopts.isPost = true;
+  }
+
+  let uobj = null;
+  if (url && typeof url === 'object') {
+    uobj = url;
+  } else if (typeof url === 'string') {
+    uobj = this.getCache(url);
+  } else {
+    throw new Error('url must be string or a object');
+  }
+  
+  if (uobj === null) {
+    uobj = this.parseUrl(url);
+    this.setCache(url, uobj);
+  }
+
+  uobj.headers = headers;
+  uobj.timeout = this.transmitTimeout;
+
+  return this._coreRequest(uobj, {body: rawbody}, postopts);
 };
 
 module.exports = new gohttp();
