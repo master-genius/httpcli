@@ -32,15 +32,22 @@ var gohttp = function (options = {}) {
   };
 
   this.bodymaker = new bodymaker(options);
+
+  this.cert = '';
+  this.key = '';
+
+  if (this.ignoretls) {
+    this.cert = fs.readFileSync(this.config.cert);
+    this.key = fs.readFileSync(this.config.key);
+  }
+
 };
 
 gohttp.prototype.parseUrl = function (url) {
   var u = new urlparse.URL(url);
   var urlobj = {
     hash :    u.hash,
-    host :    u.host,
     hostname :  u.hostname,
-    port :    u.port,
     protocol :  u.protocol,
     path :    u.pathname,
     method :  'GET',
@@ -55,44 +62,31 @@ gohttp.prototype.parseUrl = function (url) {
     let sockarr = u.pathname.split('.sock');
     urlobj.socketPath = `${sockarr[0]}.sock`;
     urlobj.path = sockarr[1];
-    delete urlobj.host;
-    delete urlobj.port;
+  } else {
+    urlobj.host = u.host;
+    urlobj.port = u.port;
   }
 
   if (u.protocol === 'https:' && this.config.ignoretls) {
     urlobj.requestCert = false;
     urlobj.rejectUnauthorized = false;
+  } else if (u.protocol === 'https:') {
+    urlobj.cert = this.cert;
+    urlobj.key = this.key;
   }
-  else if (u.protocol === 'https:') {
-    try {
-      urlobj.cert = fs.readFileSync(this.config.cert);
-      urlobj.key = fs.readFileSync(this.config.key);
-    } catch (err) {
-      throw err;
-    }
-  }
+
   return urlobj;
-};
-
-gohttp.prototype.eventTable = {};
-
-gohttp.prototype.on = function (evt, callback){
-  if (typeof callback !== 'function') return;
-  this.eventTable[evt] = callback;
 };
 
 gohttp.prototype.request = async function (url, options = {}) {
 
   var opts = {};
   if (typeof url === 'string') {
-    opts = this.getCache(url);
-    if (opts === null) {
-      opts = this.parseUrl(url);
-      this.setCache(url, opts);
-    }
+    opts = this.parseUrl(url);
   } else {
     opts = url;
   }
+
   if (opts.timeout === undefined) {
     opts.timeout = 35000;
   }
@@ -103,8 +97,10 @@ gohttp.prototype.request = async function (url, options = {}) {
     switch (k) {
       case 'timeout':
         opts.timeout = options.timeout; break;
+
       case 'auth':
         opts.auth = options.auth; break;
+
       case 'headers':
         if (opts.headers) {
           for(let i in options.headers) {
@@ -114,36 +110,32 @@ gohttp.prototype.request = async function (url, options = {}) {
           opts.headers = options.headers;
         }
         break;
+
       case 'method':
         opts.method = options.method; break;
+
       case 'encoding':
         opts.encoding = options.encoding; break;
 
       case 'dir':
         opts.dir = options.dir; break;
+
       case 'target':
         opts.target = options.target; break;
+
       case 'progress':
         opts.progress = options.progress; break;
+
       case 'body':
         opts.body = options.body; break;
+
       case 'rawBody':
         opts.rawBody = options.rawBody; break;
+
       default: ;
     }
   }
 
-  /**
-   * body : string | object
-   *   upload files: {
-   *   files: [
-   *     "image" : [
-   *     //...
-   *     ]
-   *   ],
-   *   form: {}
-   *   }
-   */
   var postData = {
     'body': '',
     'content-length': 0,
@@ -153,10 +145,12 @@ gohttp.prototype.request = async function (url, options = {}) {
     isUpload: false,
     isPost: false
   };
-  if (opts.method === 'PUT' || opts.method == 'POST' || opts.method === 'PATCH') {
+
+  if (opts.method[0] == 'P') {
     if (opts.body === undefined && opts.rawBody === undefined) {
       throw new Error('POST/PUT must with body data, please set body or rawBody');
     }
+    
     if (opts.headers['content-type'] === undefined) {
       opts.headers['content-type'] = 'application/x-www-form-urlencoded';
     }
@@ -214,42 +208,59 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState) {
   
   var h = (opts.protocol === 'https:') ? https : http;
 
+  var ret = {
+    buffers : [],
+    length: 0,
+    data : '',
+    ok : true,
+    status : 200,
+    headers : {},
+  };
+
+  ret.text = (ecd = 'utf8') => {
+    return ret.data.toString(ecd);
+  };
+
+  ret.json = (ecd = 'utf8') => {
+    return JSON.parse(ret.data.toString(ecd));
+  };
+
   return new Promise ((rv, rj) => {
-    var r = h.request(opts, (res) => {
-        var retBuf = {
-          buffers : [],
-          length : 0
-        };
-        var retData = '';
+      var r = h.request(opts, (res) => {
 
         if (opts.encoding) {
           //默认为buffer
           res.setEncoding(opts.encoding);
         }
 
-        res.on('data', (data) => {
+        let bd = '';
+        let onData = (data) => {
           //如果消息头有content-length则返回结果会是字符串而不是buffer。
           //但是无法保证content-length和实际数据是否一致，所以会把字符串转换为buffer。
           if (typeof data === 'string') {
-            let bd = Buffer.from(data);
-            retBuf.buffers.push(bd);
-            retBuf.length += bd.length;
+            bd = Buffer.from(data);
+            ret.buffers.push(bd);
+            ret.length += bd.length;
           } else {
-            retBuf.buffers.push(data);
-            retBuf.length += data.length;
+            ret.buffers.push(data);
+            ret.length += data.length;
           }
-        });
+        };
+
+        res.on('data', onData);
+
         res.on('end', () => {
-          retData = Buffer.concat(retBuf.buffers, retBuf.length);
+          ret.data = Buffer.concat(ret.buffers, ret.length);
+          ret.buffers = null;
+          ret.status = res.statusCode;
+          ret.headers = res.headers;
+
           if (res.statusCode == 200) {
-            if (opts.encoding) {
-                rv(retData.toString(opts.encoding));
-            } else {
-                rv(retData);
-            }
+            ret.ok = true;
           } else {
-            rj(new Error(`${res.statusCode}: ${retData.toString()}`));
+            ret.ok = false;
           }
+          rv(ret);
         });
   
         res.on('error', (err) => { rj(err); });
@@ -267,6 +278,7 @@ gohttp.prototype._coreRequest = async function (opts, postData, postState) {
 
     r.end();
   });
+
 };
 
 gohttp.prototype._coreDownload = function (opts, postData, postState) {
@@ -302,11 +314,12 @@ gohttp.prototype._coreDownload = function (opts, postData, postState) {
     if(headers['content-disposition']) {
       var name_split = headers['content-disposition'].split(';').filter(p => p.length > 0);
 
-      for(let i=0; i<name_split.length; i++) {
+      for(let i=0; i < name_split.length; i++) {
         if (name_split[i].indexOf('filename*=') >= 0) {
           fname = name_split[i].trim().substring(10);
-          fname = fname.split('\'')[2];
-          fname = decodeURIComponent(fname);
+          //fname = fname.split('\'')[2];
+          //fname = decodeURIComponent(fname);
+          fname = decodeURIComponent( fname.split('\'')[2] );
         } else if(name_split[i].indexOf('filename=') >= 0) {
           fname = name_split[i].trim().substring(9);
         }
@@ -475,7 +488,56 @@ gohttp.prototype.download = function(url, options = {}) {
 
 };
 
+/**
+ * 这个接口主要是为了快速转发，接收到的数据，不需要经过任何解析，直接转发，不经过request接口的复杂选项解析。
+ * 并且body必须是buffer类型。 如果确定了要转发的url，你可以先通过parseUrl解析后并保存结果，之后每次都直接传递这个对象。
+ */
 
+gohttp.prototype.transmit = function (url, opts = {}) {
+
+  let postopts = {
+    isPost: false
+  };
+
+  if (opts.rawbody && opts.rawbody instanceof Buffer) {
+    postopts.isPost = true;
+  } else {
+    opts.rawbody = '';
+  }
+
+  let uobj = null;
+
+  if (typeof url === 'string') {
+    uobj = this.parseUrl(url);
+
+  } else if (url && typeof url === 'object') {
+    uobj = url;
+  } else {
+    throw new Error('url must be string or a object');
+  }
+
+  if (opts.headers && typeof opts.headers === 'object') {
+    for (let k in opts.headers) {
+      uobj.headers[k] = opts.headers[k];
+    }
+  }
+
+  if (opts.timeout && typeof opts.timeout == 'number') {
+    uobj.timeout = opts.timeout;
+  } else {
+    uobj.timeout = 35000;
+  }
+
+  if (opts.method) {
+    uobj.method = opts.method;
+  }
+
+  return this._coreRequest(uobj, {body: opts.rawbody}, postopts);
+};
+
+module.exports = new gohttp();
+
+/* 
 gohttp.prototype.cacheUrl = {};
 gohttp.prototype.cacheCount = 0;
 gohttp.prototype.maxCache = 20000;
@@ -512,42 +574,4 @@ gohttp.prototype.cleanCache = function () {
   this.cacheUrl = {};
   this.cacheCount = 0;
 };
-
-/**
- * 这个接口主要是为了快速转发，接收到的数据，不需要经过任何解析，直接转发，不经过request接口的复杂选项解析。
- * 并且body必须是buffer类型。
- * 首次操作，会把解析的url缓存到cacheLastUrl。
- * 如果确定了要转发的url，你可以先通过parseUrl解析后并保存结果，之后每次都直接传递这个对象。
  */
-gohttp.prototype.transmitTimeout = 20000;
-
-gohttp.prototype.transmit = function (url, method, headers, rawbody = null) {
-  let postopts = {
-    isPost: false
-  };
-  if (rawbody && rawbody instanceof Buffer) {
-    postopts.isPost = true;
-  }
-
-  let uobj = null;
-  if (url && typeof url === 'object') {
-    uobj = url;
-  } else if (typeof url === 'string') {
-    uobj = this.getCache(url);
-  } else {
-    throw new Error('url must be string or a object');
-  }
-  
-  if (uobj === null) {
-    uobj = this.parseUrl(url);
-    this.setCache(url, uobj);
-  }
-
-  uobj.headers = headers;
-  uobj.timeout = this.transmitTimeout;
-  uobj.method = method;
-
-  return this._coreRequest(uobj, {body: rawbody}, postopts);
-};
-
-module.exports = new gohttp();

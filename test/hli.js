@@ -1,9 +1,9 @@
-const hcli = require('../httpcli.js');
+const hcli = require('../gohttp.js');
 
 for(let i=0; i<1000; i++) {
     hcli.get('https://localhost:2021/test',{timeout:1500})
-    .then(data => {
-        console.log(data.toString());
+    .then(res => {
+        console.log(res.text());
     }, err => {
         throw err; 
     })
@@ -11,13 +11,13 @@ for(let i=0; i<1000; i++) {
         console.log(err);
     });
 
-    hcli.post('https://localhost:2021/p', {
+    hcli.post('https://localhost:2021/test', {
         body : {user : 'brave'}
     })
-    .then(data => {
-        console.log(data.toString());
+    .then(res => {
+        console.log(res.text());
     }, err => {
-        throw err; 
+        throw err;
     })
     .catch(err => {
         console.log(err);

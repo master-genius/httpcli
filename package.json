@@ -1,8 +1,8 @@
 {
   "name": "gohttp",
-  "version": "3.1.0",
+  "version": "3.2.1",
   "description": "http client for HTTP/1.1",
-  "main": "httpcli.js",
+  "main": "gohttp.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
