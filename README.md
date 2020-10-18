@@ -20,11 +20,13 @@ npm i gohttp
 const gohttp = require('gohttp');
 
 gohttp.get('http://localhost:2020/')
-.then(data => {
-    console.log(data);
-}, err => {
-    console.log(err);
-});
+        .then(res => {
+            console.log(res.headers, res.status);
+            return res.text();
+        })
+        .then(result => {
+            console.log(result);
+        });
 
 ```
 
@@ -35,15 +37,16 @@ gohttp.get('http://localhost:2020/')
 const gohttp = require('gohttp');
 
 gohttp.post('http://localhost:2020/p', {
-    body : {
-        user: 'wang'
-    }
-})
-.then(data => {
-    console.log(data);
-}, err => {
-    console.log(err);
-});
+            body : {
+                user: 'wang'
+            }
+        })
+        .then(res => {
+            return res.text();
+        })
+        .then(result => {
+            console.log(result);
+        });
 
 ```
 
@@ -54,21 +57,22 @@ gohttp.post('http://localhost:2020/p', {
 const gohttp = require('gohttp');
 
 gohttp.upload('http://localhost:2020/upload', {
-    files: {
-        image: [
-            'pictures/a.jpg',
-            'pictures/b.png'
-        ],
-        video: [
-            'videos/a.mp4',
-            'videos/b.mp4'
-        ]
-    }
-})
-.then(data => {
-    console.log(data);
-}, err => {
-    console.log(err);
-});
+            files: {
+                image: [
+                    'pictures/a.jpg',
+                    'pictures/b.png'
+                ],
+                video: [
+                    'videos/a.mp4',
+                    'videos/b.mp4'
+                ]
+            }
+        })
+        .then(res => {
+            return res.text();
+        })
+        .then(result => {
+            console.log(result);
+        });
 
 ```

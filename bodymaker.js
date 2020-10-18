@@ -77,6 +77,7 @@ bodymaker.prototype.makeUploadData = async function (r) {
   var content_length = Buffer.byteLength(formData);
 
   var end_data = `\r\n--${bdy}--\r\n`;
+
   content_length += Buffer.byteLength(end_data);
 
   if (r.files && typeof r.files === 'object') {
@@ -150,11 +151,14 @@ bodymaker.prototype.makeUploadData = async function (r) {
 };
 
 bodymaker.prototype.boundary = function() {
-  var hash = crypto.createHash('md5');
-  hash.update(`${Date.now()}-${Math.random()}`);
-  var bdy = hash.digest('hex');
+  //var hash = crypto.createHash('md5');
+  //hash.update(`${Date.now()}-${Math.random()}`);
+  //var bdy = hash.digest('hex');
 
-  return `----${bdy}`;
+  let bdy = `${Date.now()}${parseInt(Math.random() * 10000)+10001}`;
+
+  return `----------------${bdy}`;
+
 };
 
 module.exports = bodymaker;
