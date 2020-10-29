@@ -488,6 +488,24 @@ gohttp.prototype.download = function(url, options = {}) {
 
 };
 
+//upload的简单封装，让参数更简单，用于快速文件上传写起来简单些。
+gohttp.prototype.up = async function (url, opts = {}) {
+  if (typeof opts !== 'object' || opts.file === undefined) {
+    throw new Error('Error: file or form not found. options : {file:FILE_PATH, name : UPLOAD_NAME}');
+  }
+
+  /* if (opts.name === undefined) {
+    opts.name = 'file';
+  } */
+
+  opts.files = {};
+
+  opts.files[ opts.name || 'file' ] = opts.file;
+
+  return this.upload(url, opts);
+
+};
+
 /**
  * 这个接口主要是为了快速转发，接收到的数据，不需要经过任何解析，直接转发，不经过request接口的复杂选项解析。
  * 并且body必须是buffer类型。 如果确定了要转发的url，你可以先通过parseUrl解析后并保存结果，之后每次都直接传递这个对象。
